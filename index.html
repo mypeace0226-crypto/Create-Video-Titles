@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>유튜브 제목·썸네일 전략 생성기</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Black+Han+Sans&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d0d14;
+  --s1: #13131e;
+  --s2: #1c1c2e;
+  --bd: #2e2e48;
+  --acc: #ff6b35;
+  --gold: #ffd700;
+  --grn: #4ade80;
+  --blu: #60a5fa;
+  --tx: #eeeeff;
+  --tx2: #8888aa;
+  --r: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--tx); min-height: 100vh;
+  background-image: radial-gradient(ellipse at 10% 0%, rgba(255,107,53,.07) 0%, transparent 50%),
+                    radial-gradient(ellipse at 90% 100%, rgba(96,165,250,.05) 0%, transparent 50%); }
+
+/* HEADER */
+.hdr { background: rgba(13,13,20,.97); border-bottom: 1px solid var(--bd); padding: 13px 20px;
+  display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; }
+.hdr-logo { background: linear-gradient(135deg,#ff6b35,#ff9f43); border-radius: 8px; padding: 5px 11px;
+  font-family: 'Black Han Sans', sans-serif; font-size: 14px; color: #fff; }
+.hdr-title { font-family: 'Black Han Sans', sans-serif; font-size: 17px;
+  background: linear-gradient(90deg,#eeeeff,#ffd700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hdr-badge { margin-left: auto; font-size: 11px; color: var(--tx2); background: rgba(255,215,0,.08);
+  border: 1px solid rgba(255,215,0,.2); border-radius: 20px; padding: 3px 10px; }
+
+/* WRAP */
+.wrap { max-width: 900px; margin: 0 auto; padding: 20px 14px 60px; }
+
+/* CARD */
+.card { background: var(--s1); border: 1px solid var(--bd); border-radius: 16px; margin-bottom: 16px; overflow: hidden; }
+.card-head { padding: 13px 20px; border-bottom: 1px solid var(--bd); background: var(--s2);
+  display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.card-head.static { cursor: default; }
+.card-title { font-family: 'Black Han Sans', sans-serif; font-size: 14px; color: var(--acc);
+  display: flex; align-items: center; gap: 8px; }
+.card-title::before { content: ''; display: block; width: 3px; height: 16px;
+  background: var(--acc); border-radius: 2px; }
+.card-body { padding: 20px; }
+.toggle-btn { font-size: 12px; color: var(--tx2); }
+
+/* BADGE */
+.badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+  background: rgba(255,215,0,.12); color: var(--gold); border: 1px solid rgba(255,215,0,.25); }
+
+/* API TABS */
+.api-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+.api-tab { padding: 10px 6px; border: 1px solid var(--bd); border-radius: 10px; background: var(--s2);
+  color: var(--tx2); font-size: 12px; font-weight: 700; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; transition: all .15s; }
+.api-tab.active-claude { border: 2px solid #ff6b35; background: rgba(255,107,53,.1); color: #ff6b35; }
+.api-tab.active-openai { border: 2px solid #4ade80; background: rgba(74,222,128,.1); color: #4ade80; }
+.api-tab.active-google { border: 2px solid #60a5fa; background: rgba(96,165,250,.1); color: #60a5fa; }
+.api-tab-icon { font-size: 20px; }
+.api-tab-status { font-size: 10px; }
+.api-tab-status.ok { color: #4ade80; }
+.api-tab-status.no { color: #555577; }
+
+/* KEY INPUT */
+.key-wrap { position: relative; margin-bottom: 6px; }
+.key-wrap input { background: var(--bg); border: 1px solid var(--bd); border-radius: 10px;
+  padding: 10px 80px 10px 14px; color: var(--tx); font-family: monospace; font-size: 13px; width: 100%; outline: none;
+  transition: border-color .2s; }
+.key-wrap input:focus { border-color: var(--acc); }
+.key-wrap input.ok-claude { border-color: #ff6b35; }
+.key-wrap input.ok-openai { border-color: #4ade80; }
+.key-wrap input.ok-google { border-color: #60a5fa; }
+.key-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--tx2); cursor: pointer; font-size: 11px; padding: 4px 6px; }
+.key-hint { font-size: 11px; color: var(--tx2); margin-bottom: 12px; }
+.key-ok-msg { background: rgba(255,107,53,.08); border: 1px solid rgba(255,107,53,.25);
+  border-radius: 10px; padding: 9px 14px; font-size: 12px; color: var(--acc); margin-top: 8px; }
+
+/* KEY SUMMARY */
+.key-summary { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.key-sum-item { flex: 1; min-width: 80px; background: var(--bg); border: 1px solid var(--bd);
+  border-radius: 8px; padding: 8px 10px; font-size: 11px; cursor: pointer; }
+.key-sum-item.has-key { border-color: #2e4a2e; }
+.key-sum-label { font-weight: 700; margin-bottom: 2px; }
+.key-sum-val { color: var(--tx2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* FORM */
+label { font-size: 12px; font-weight: 700; color: var(--tx2); display: block; margin-bottom: 6px; letter-spacing: .5px; }
+input[type=text], select, textarea {
+  background: var(--bg); border: 1px solid var(--bd); border-radius: 10px;
+  padding: 10px 14px; color: var(--tx); font-family: 'Noto Sans KR', sans-serif;
+  font-size: 14px; width: 100%; outline: none; transition: border-color .2s; }
+input[type=text]:focus, select:focus, textarea:focus { border-color: var(--acc); }
+select option { background: var(--s2); }
+textarea { min-height: 60px; resize: vertical; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.form-group { margin-bottom: 14px; }
+
+/* CHIPS */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; background: var(--s2);
+  border: 1px solid var(--bd); border-radius: 20px; padding: 6px 12px;
+  cursor: pointer; font-size: 12px; font-weight: 500; color: var(--tx2); transition: all .15s; }
+.chip.on { border-color: var(--acc); background: rgba(255,107,53,.14); color: #ff8c5a; }
+.chip-ctr { color: var(--grn); font-size: 10px; }
+
+/* GEN BTN */
+.gen-btn { width: 100%; padding: 15px; margin-top: 8px;
+  background: linear-gradient(135deg,#ff6b35,#ff9f43);
+  border: none; border-radius: 12px; color: #fff;
+  font-family: 'Black Han Sans', sans-serif; font-size: 16px; letter-spacing: 2px;
+  cursor: pointer; box-shadow: 0 4px 20px rgba(255,107,53,.3); transition: all .15s; }
+.gen-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255,107,53,.5); }
+.gen-btn:disabled { background: #2e2e48; color: var(--tx2); cursor: not-allowed; transform: none; box-shadow: none; }
+.need-key-msg { text-align: center; font-size: 12px; color: var(--acc); margin-top: 8px; }
+
+/* PROGRESS */
+.prog { display: none; margin-top: 14px; }
+.prog.show { display: block; }
+.prog-bar { height: 3px; background: var(--s2); border-radius: 2px; overflow: hidden; }
+.prog-fill { height: 100%; width: 0%; background: linear-gradient(90deg,#ff6b35,#ffd700,#4ade80);
+  border-radius: 2px; transition: width .4s; }
+.prog-msg { text-align: center; font-size: 13px; color: var(--tx2); margin-top: 10px; animation: pulse 1.4s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+/* RESULTS */
+#results { display: none; }
+.result-card { background: var(--s1); border: 1px solid var(--bd); border-radius: 16px;
+  margin-bottom: 16px; overflow: hidden; animation: fadeup .35s ease both; }
+@keyframes fadeup { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+/* TITLE CARDS */
+.title-card { background: var(--s2); border: 1px solid var(--bd); border-radius: 12px;
+  padding: 13px 15px; display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; transition: border-color .2s; }
+.title-card:hover { border-color: var(--acc); }
+.title-rank { font-family: 'Black Han Sans', sans-serif; font-size: 26px; min-width: 28px; line-height: 1.1; }
+.title-rank.r1 { color: var(--acc); }
+.title-rank.r2 { color: var(--tx2); }
+.title-rank.r3 { color: #c07030; }
+.title-body { flex: 1; }
+.title-text { font-size: 16px; font-weight: 700; line-height: 1.6; margin-bottom: 7px; }
+.title-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.tag-type { background: rgba(255,107,53,.15); color: #ff8c5a; }
+.tag-ctr  { background: rgba(74,222,128,.15); color: #4ade80; }
+.tag-len  { background: rgba(144,144,200,.12); color: var(--tx2); }
+.title-reason { font-size: 12px; color: var(--tx2); line-height: 1.6; }
+.copy-btn { background: var(--bg); border: 1px solid var(--bd); border-radius: 8px;
+  padding: 6px 12px; color: var(--tx2); font-size: 12px; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0; transition: all .18s; font-family: 'Noto Sans KR', sans-serif; }
+.copy-btn:hover { border-color: var(--acc); color: var(--acc); }
+.copy-btn.ok { border-color: var(--grn); color: var(--grn); }
+
+/* ALL TITLES */
+.all-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.type-box { background: var(--s2); border: 1px solid var(--bd); border-radius: 12px; padding: 14px; }
+.type-name { font-size: 11px; font-weight: 700; color: var(--acc); margin-bottom: 10px; }
+.type-ctr { color: var(--grn); font-size: 10px; margin-left: 6px; }
+.mini-title { font-size: 13px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.05);
+  line-height: 1.55; cursor: pointer; transition: color .18s; }
+.mini-title:last-child { border-bottom: none; padding-bottom: 0; }
+.mini-title:hover { color: var(--gold); }
+.mini-title.copied { color: var(--grn); }
+
+/* THUMBS */
+.thumb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.thumb-card { background: var(--s2); border: 1px solid var(--bd); border-radius: 12px; padding: 16px; }
+.thumb-label { font-size: 12px; font-weight: 700; color: var(--tx2); margin-bottom: 10px; }
+.thumb-vis { aspect-ratio: 16/9; border-radius: 8px; display: flex; align-items: center;
+  justify-content: center; margin-bottom: 12px; border: 1px solid rgba(255,255,255,.05); }
+.thumb-vis-inner { text-align: center; padding: 14px; }
+.thumb-expr { font-size: 10px; opacity: .65; margin-bottom: 6px; }
+.thumb-txt { font-family: 'Black Han Sans', sans-serif; font-size: 18px; letter-spacing: 1px;
+  text-shadow: 2px 2px 6px rgba(0,0,0,.8); }
+.thumb-specs { font-size: 12px; color: var(--tx2); line-height: 1.9; }
+.thumb-specs b { color: var(--tx); }
+
+/* CHECKLIST */
+.cl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.cl-box { background: var(--s2); border-radius: 12px; padding: 16px; }
+.cl-box h3 { font-size: 13px; font-weight: 700; color: var(--tx2); margin-bottom: 12px; }
+.cl-item { display: flex; align-items: center; gap: 8px; padding: 7px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04); font-size: 13px; }
+.cl-item:last-child { border-bottom: none; }
+.cl-pts { margin-left: auto; font-size: 11px; color: var(--tx2); }
+.score-box { background: var(--s2); border: 1px solid var(--bd); border-radius: 12px; padding: 20px; text-align: center; }
+.score-num { font-family: 'Black Han Sans', sans-serif; font-size: 52px; line-height: 1; }
+.score-max { font-size: 22px; color: var(--tx2); }
+.score-rating { font-size: 15px; font-weight: 700; margin-top: 8px; }
+
+/* RAW */
+.raw-box { background: var(--s2); border-radius: 10px; padding: 16px; font-size: 13px;
+  line-height: 2; white-space: pre-wrap; word-break: break-word; max-height: 380px; overflow-y: auto; }
+.raw-box::-webkit-scrollbar { width: 5px; }
+.raw-box::-webkit-scrollbar-thumb { background: var(--bd); border-radius: 3px; }
+.copy-all-btn { display: flex; align-items: center; gap: 8px; margin-top: 12px;
+  background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.25); border-radius: 10px;
+  padding: 10px 16px; color: var(--grn); font-size: 13px; font-weight: 700; cursor: pointer;
+  font-family: 'Noto Sans KR', sans-serif; transition: all .18s; }
+.copy-all-btn:hover { background: rgba(74,222,128,.18); }
+
+/* VERCEL PROXY 입력 */
+.proxy-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 14px; }
+.proxy-row input { flex: 1; }
+.proxy-save-btn { background: rgba(255,107,53,.15); border: 1px solid rgba(255,107,53,.4);
+  color: var(--acc); border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; font-family: 'Noto Sans KR', sans-serif; }
+
+@media (max-width: 600px) {
+  .form-row { grid-template-columns: 1fr; }
+  .cl-grid { grid-template-columns: 1fr; }
+  .thumb-grid { grid-template-columns: 1fr; }
+  .all-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">▶</div>
+  <div class="hdr-title">유튜브 제목·썸네일 전략 생성기</div>
+  <div class="hdr-badge">🔥 클릭률 8% 목표</div>
+</div>
+
+<div class="wrap">
+
+  <!-- ── API 키 설정 ─────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-head" onclick="toggleCard('apiBody','apiToggle')">
+      <div class="card-title" id="apiCardTitle">🔑 API 키 설정</div>
+      <span class="toggle-btn" id="apiToggle">▲ 접기</span>
+    </div>
+    <div class="card-body" id="apiBody">
+
+      <!-- Vercel 프록시 URL -->
+      <label>🌐 Vercel 프록시 URL (Claude API 사용 시)</label>
+      <div class="proxy-row">
+        <input type="text" id="proxyUrl" value="https://my-story-olive.vercel.app" placeholder="https://your-proxy.vercel.app" />
+        <button class="proxy-save-btn" onclick="saveProxy()">저장</button>
+      </div>
+      <div class="key-hint" style="margin-bottom:16px">💡 Claude API는 프록시를 통해 호출합니다. OpenAI·Google은 직접 호출합니다.</div>
+
+      <!-- AI 탭 -->
+      <div class="api-tabs">
+        <div class="api-tab active-claude" id="tab-claude" onclick="switchApi('claude')">
+          <span class="api-tab-icon">🟠</span>
+          <span>Claude API</span>
+          <span class="api-tab-status no" id="status-claude">○ 미입력</span>
+        </div>
+        <div class="api-tab" id="tab-openai" onclick="switchApi('openai')">
+          <span class="api-tab-icon">🟢</span>
+          <span>OpenAI API</span>
+          <span class="api-tab-status no" id="status-openai">○ 미입력</span>
+        </div>
+        <div class="api-tab" id="tab-google" onclick="switchApi('google')">
+          <span class="api-tab-icon">🔵</span>
+          <span>Google AI</span>
+          <span class="api-tab-status no" id="status-google">○ 미입력</span>
+        </div>
+      </div>
+
+      <!-- 키 입력 패널 -->
+      <div id="panel-claude">
+        <label style="color:#ff6b35">🟠 Claude API 키</label>
+        <div class="key-wrap">
+          <input type="password" id="key-claude" placeholder="sk-ant-api03-..." oninput="updateKeyStatus('claude')" />
+          <button class="key-toggle" onclick="toggleKeyVis('claude')">👁 보기</button>
+        </div>
+        <div class="key-hint">💡 console.anthropic.com → API Keys · 프록시를 통해 호출됩니다</div>
+      </div>
+      <div id="panel-openai" style="display:none">
+        <label style="color:#4ade80">🟢 OpenAI API 키</label>
+        <div class="key-wrap">
+          <input type="password" id="key-openai" placeholder="sk-proj-..." oninput="updateKeyStatus('openai')" />
+          <button class="key-toggle" onclick="toggleKeyVis('openai')">👁 보기</button>
+        </div>
+        <div class="key-hint">💡 platform.openai.com → API keys · 직접 호출 (CORS 허용 필요)</div>
+      </div>
+      <div id="panel-google" style="display:none">
+        <label style="color:#60a5fa">🔵 Google AI API 키</label>
+        <div class="key-wrap">
+          <input type="password" id="key-google" placeholder="AIzaSy..." oninput="updateKeyStatus('google')" />
+          <button class="key-toggle" onclick="toggleKeyVis('google')">👁 보기</button>
+        </div>
+        <div class="key-hint">💡 aistudio.google.com → Get API key · 직접 호출</div>
+      </div>
+
+      <!-- 키 요약 -->
+      <div class="key-summary">
+        <div class="key-sum-item" id="sum-claude" onclick="switchApi('claude')">
+          <div class="key-sum-label" style="color:#ff6b35">🟠 Claude</div>
+          <div class="key-sum-val" id="sumval-claude">미입력</div>
+        </div>
+        <div class="key-sum-item" id="sum-openai" onclick="switchApi('openai')">
+          <div class="key-sum-label" style="color:#4ade80">🟢 OpenAI</div>
+          <div class="key-sum-val" id="sumval-openai">미입력</div>
+        </div>
+        <div class="key-sum-item" id="sum-google" onclick="switchApi('google')">
+          <div class="key-sum-label" style="color:#60a5fa">🔵 Google</div>
+          <div class="key-sum-val" id="sumval-google">미입력</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 영상 정보 입력 ──────────────────────────────────── -->
+  <div class="card">
+    <div class="card-head static">
+      <div class="card-title">📋 영상 정보 입력</div>
+    </div>
+    <div class="card-body">
+      <div class="form-group">
+        <label>📌 영상 주제</label>
+        <input type="text" id="topic" placeholder="예: 창세기 1장 천지창조, 다윗과 골리앗, 처음 만났는데 호감 가는 사람의 특징" />
+      </div>
+      <div class="form-group">
+        <label>💡 핵심 메시지 (생략 가능)</label>
+        <textarea id="message" placeholder="시청자에게 전달하고 싶은 것"></textarea>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>👥 타겟 시청자</label>
+          <select id="target">
+            <option>60대 이상 시니어 어르신</option>
+            <option>40~60대 중장년 기독교 신자</option>
+            <option>전 연령 기독교 신자</option>
+            <option>40~60대 중장년층</option>
+            <option>20~40대 청장년</option>
+          </select>
+        </div>
+        <div>
+          <label>🎬 콘텐츠 유형</label>
+          <select id="ctype">
+            <option>성경 애니메이션</option>
+            <option>성경 말씀 묵상</option>
+            <option>CCM / 찬양</option>
+            <option>심리 / 자기계발</option>
+            <option>건강 / 의학 정보</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>⏱ 영상 길이</label>
+          <select id="dur">
+            <option>10분</option><option>5분 (쇼츠)</option>
+            <option>20분</option><option>30분</option>
+          </select>
+        </div>
+        <div>
+          <label>📺 채널 규모</label>
+          <select id="subs">
+            <option>신생 채널 (구독자 100명 미만)</option>
+            <option>성장 초기 (구독자 1천명 미만)</option>
+            <option>중소 채널 (구독자 1만명 미만)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>🎯 심리 트리거 (복수 선택)</label>
+        <div class="chips" id="chips">
+          <span class="chip on" data-id="호기심 유발">🤔 호기심 유발 <span class="chip-ctr">9.4%</span></span>
+          <span class="chip on" data-id="감동·위로">🙏 감동·위로</span>
+          <span class="chip"    data-id="불안 자극">😰 불안 자극 <span class="chip-ctr">8.1%</span></span>
+          <span class="chip on" data-id="권위·숫자">📊 권위·숫자 <span class="chip-ctr">8.7%</span></span>
+          <span class="chip"    data-id="반전 효과">🔄 반전 효과 <span class="chip-ctr">9.8%</span></span>
+          <span class="chip"    data-id="손실 회피">⚠️ 손실 회피 <span class="chip-ctr">7.9%</span></span>
+          <span class="chip"    data-id="이득 보장">💰 이득 보장 <span class="chip-ctr">8.3%</span></span>
+        </div>
+      </div>
+
+      <button class="gen-btn" id="genBtn" onclick="generate()">🚀 제목·썸네일 전략 생성하기</button>
+      <div class="need-key-msg" id="needKeyMsg" style="display:none">⬆ 위에서 API 키를 먼저 입력해주세요</div>
+
+      <div class="prog" id="prog">
+        <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+        <div class="prog-msg" id="progMsg">AI가 분석 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 결과 ────────────────────────────────────────────── -->
+  <div id="results">
+
+    <div class="result-card" style="animation-delay:.05s">
+      <div class="card-head static">
+        <div class="card-title" style="color:var(--gold)">🏆 최종 추천 제목 TOP 3</div>
+        <span class="badge">바로 사용 가능</span>
+      </div>
+      <div class="card-body" id="top3"></div>
+    </div>
+
+    <div class="result-card" style="animation-delay:.1s">
+      <div class="card-head static">
+        <div class="card-title" style="color:var(--gold)">📋 유형별 전체 제목</div>
+        <span class="badge">클릭하면 복사</span>
+      </div>
+      <div class="card-body"><div class="all-grid" id="allGrid"></div></div>
+    </div>
+
+    <div class="result-card" style="animation-delay:.15s">
+      <div class="card-head static">
+        <div class="card-title" style="color:var(--gold)">🎨 썸네일 전략 A/B</div>
+        <span class="badge">색상·레이아웃</span>
+      </div>
+      <div class="card-body"><div class="thumb-grid" id="thumbGrid"></div></div>
+    </div>
+
+    <div class="result-card" style="animation-delay:.2s">
+      <div class="card-head static">
+        <div class="card-title" style="color:var(--gold)">✅ 검수 체크리스트</div>
+        <span class="badge">클릭률 예측 점수</span>
+      </div>
+      <div class="card-body">
+        <div class="cl-grid" id="clGrid"></div>
+        <div class="score-box" id="scoreBox"></div>
+      </div>
+    </div>
+
+    <div class="result-card" style="animation-delay:.25s">
+      <div class="card-head static">
+        <div class="card-title" style="color:var(--gold)">📄 전략 리포트 원문</div>
+        <span class="badge">상세 분석</span>
+      </div>
+      <div class="card-body">
+        <div class="raw-box" id="rawBox"></div>
+        <button class="copy-all-btn" onclick="copyAll()">📋 전체 리포트 복사하기</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── 상태 ───────────────────────────────────────────── */
+let activeApi = 'claude';
+let proxyUrl  = 'https://my-story-olive.vercel.app';
+let rawText   = '';
+let progTimer = null;
+
+const PROG_MSGS = ['AI가 주제를 분석 중...','심리 트리거 공식 적용 중...','클릭률 높은 제목 생성 중...','썸네일 전략 설계 중...','최종 검수 체크 중...'];
+const CTR_MAP = {'호기심 유발형':'9.4','감동·위로형':'—','불안 자극형':'8.1','권위·숫자형':'8.7','반전 효과형':'9.8','손실 회피형':'7.9','이득 보장형':'8.3'};
+
+/* ── 초기화 ─────────────────────────────────────────── */
+document.querySelectorAll('.chip').forEach(c => {
+  c.addEventListener('click', () => c.classList.toggle('on'));
+});
+
+/* ── API 탭 전환 ─────────────────────────────────────── */
+function switchApi(api) {
+  activeApi = api;
+  ['claude','openai','google'].forEach(a => {
+    const tab = document.getElementById('tab-'+a);
+    tab.className = 'api-tab';
+    if (a===api) tab.classList.add('active-'+a);
+    document.getElementById('panel-'+a).style.display = a===api?'block':'none';
+  });
+  updateGenBtn();
+}
+
+function toggleKeyVis(api) {
+  const inp = document.getElementById('key-'+api);
+  const btn = inp.nextElementSibling;
+  inp.type = inp.type==='password' ? 'text' : 'password';
+  btn.textContent = inp.type==='password' ? '👁 보기' : '🙈 숨기기';
+}
+
+function updateKeyStatus(api) {
+  const val = document.getElementById('key-'+api).value.trim();
+  const statusEl = document.getElementById('status-'+api);
+  const sumEl    = document.getElementById('sum-'+api);
+  const sumValEl = document.getElementById('sumval-'+api);
+  const inp      = document.getElementById('key-'+api);
+
+  if (val) {
+    statusEl.textContent = '● 입력됨';
+    statusEl.className = 'api-tab-status ok';
+    sumEl.classList.add('has-key');
+    sumValEl.textContent = val.slice(0,12)+'...';
+    inp.className = 'ok-'+api;
+  } else {
+    statusEl.textContent = '○ 미입력';
+    statusEl.className = 'api-tab-status no';
+    sumEl.classList.remove('has-key');
+    sumValEl.textContent = '미입력';
+    inp.className = '';
+  }
+  updateGenBtn();
+}
+
+function updateGenBtn() {
+  const hasKey = !!document.getElementById('key-'+activeApi)?.value?.trim();
+  const btn    = document.getElementById('genBtn');
+  const msg    = document.getElementById('needKeyMsg');
+  btn.disabled = !hasKey;
+  msg.style.display = hasKey ? 'none' : 'block';
+}
+
+function saveProxy() {
+  proxyUrl = document.getElementById('proxyUrl').value.trim().replace(/\/$/, '');
+  alert('✓ 프록시 URL 저장됨: '+proxyUrl);
+}
+
+function toggleCard(bodyId, toggleId) {
+  const body   = document.getElementById(bodyId);
+  const toggle = document.getElementById(toggleId);
+  const hidden = body.style.display === 'none';
+  body.style.display  = hidden ? 'block' : 'none';
+  toggle.textContent  = hidden ? '▲ 접기' : '▼ 펼치기';
+}
+
+/* ── 프로그레스 ─────────────────────────────────────── */
+let progIdx = 0, progPct = 0;
+function startProg() {
+  progPct = 5; progIdx = 0;
+  document.getElementById('prog').classList.add('show');
+  document.getElementById('progFill').style.width = '5%';
+  document.getElementById('progMsg').textContent = PROG_MSGS[0];
+  progTimer = setInterval(() => {
+    progIdx = (progIdx+1) % PROG_MSGS.length;
+    progPct = Math.min(88, progPct+15);
+    document.getElementById('progFill').style.width = progPct+'%';
+    document.getElementById('progMsg').textContent = PROG_MSGS[progIdx];
+  }, 2000);
+}
+function stopProg() {
+  clearInterval(progTimer);
+  document.getElementById('progFill').style.width = '100%';
+  setTimeout(() => document.getElementById('prog').classList.remove('show'), 600);
+}
+
+/* ── 생성 메인 ──────────────────────────────────────── */
+async function generate() {
+  const topic   = document.getElementById('topic').value.trim();
+  const message = document.getElementById('message').value.trim();
+  const apiKey  = document.getElementById('key-'+activeApi).value.trim();
+  const target  = document.getElementById('target').value;
+  const ctype   = document.getElementById('ctype').value;
+  const dur     = document.getElementById('dur').value;
+  const subs    = document.getElementById('subs').value;
+
+  if (!apiKey)  { alert('API 키를 입력해주세요!'); return; }
+  if (!topic)   { alert('영상 주제를 입력해주세요!'); return; }
+
+  const triggers = [...document.querySelectorAll('.chip.on')].map(c => c.dataset.id);
+  if (!triggers.length) { alert('트리거를 하나 이상 선택해주세요!'); return; }
+
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('genBtn').textContent = '⏳ 생성 중...';
+  document.getElementById('results').style.display = 'none';
+  startProg();
+
+  const sys = `당신은 한국 유튜브 전문 콘텐츠 전략가입니다. 클릭률 8% 이상을 달성하는 제목을 만드는 전문가입니다.
+절대 규칙: 1.입력된 주제와 직접 관련된 제목만 2.한국어 자연스러운 표현 3.타겟 감성에 맞게 4.완성된 문장 5.신앙 콘텐츠는 신자 정서에 맞게`;
+
+  const prompt = `영상 주제: ${topic}
+핵심 메시지: ${message||'(주제에서 유추)'}
+타겟: ${target} / 유형: ${ctype} / 길이: ${dur} / 채널: ${subs}
+트리거: ${triggers.join(', ')}
+
+【1단계】 유형별 제목 (각 3개)
+${triggers.map(t=>`[${t}형]\n1. \n2. \n3. `).join('\n')}
+규칙: "${topic}" 직접 관련, 30자 내외, 숫자 활용, ${target} 감성
+
+【2단계】 TOP 3
+1위: (제목)
+유형: (유형명) | 예상CTR: (숫자)% | 이유: (한 문장)
+2위: (제목)
+유형: (유형명) | 예상CTR: (숫자)% | 이유: (한 문장)
+3위: (제목)
+유형: (유형명) | 예상CTR: (숫자)% | 이유: (한 문장)
+
+【3단계】 썸네일
+[버전A - 보수적]
+배경색: (#코드)
+텍스트색: (#코드)
+핵심문구: (4단어이내)
+표정/분위기: (묘사)
+레이아웃: (설명)
+예상CTR: (숫자)%
+[버전B - 공격적]
+배경색: (#코드)
+텍스트색: (#코드)
+핵심문구: (4단어이내)
+표정/분위기: (묘사)
+레이아웃: (설명)
+예상CTR: (숫자)%
+
+【4단계】 체크리스트 (1위 기준)
+제목체크:
+- 키워드 맨 앞 3단어 이내: ✅
+- 구체적 숫자 포함: ✅
+- 35자 이내: ✅
+- 정보 격차 생성: ✅
+- 감정 트리거 명확: ✅
+- 상식 파괴 요소: ❌
+썸네일체크:
+- 얼굴 60% 이상: ✅
+- 감동 1.5배 과장: ✅
+- 정면 카메라 응시: ✅
+- 보색 대비 활용: ✅
+- 텍스트 4단어 이내: ✅
+- 0.5초 안에 읽힘: ✅
+총점: 18/20점
+등급: 클릭률 8% 이상 확실 🔥`;
+
+  try {
+    let text = '';
+
+    if (activeApi === 'claude') {
+      /* Vercel 프록시 경유 */
+      const endpoint = proxyUrl + '/api/claude';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify({
+          model: 'claude-opus-4-5',
+          max_tokens: 3000,
+          system: sys,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`프록시 오류 ${res.status}: ${err.slice(0,200)}`);
+      }
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      text = data.content?.map(i=>i.text||'').join('')||'';
+
+    } else if (activeApi === 'openai') {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+apiKey },
+        body: JSON.stringify({ model:'gpt-4o', max_tokens:3000, messages:[{role:'system',content:sys},{role:'user',content:prompt}] })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      text = data.choices?.[0]?.message?.content||'';
+
+    } else {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents:[{parts:[{text:sys+'\n\n'+prompt}]}] })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    }
+
+    rawText = text;
+    renderAll(parseResult(text));
+
+  } catch(e) {
+    alert('오류: ' + e.message);
+    console.error(e);
+  } finally {
+    document.getElementById('genBtn').disabled = false;
+    document.getElementById('genBtn').textContent = '🚀 제목·썸네일 전략 생성하기';
+    updateGenBtn();
+    stopProg();
+  }
+}
+
+/* ── 파서 ────────────────────────────────────────────── */
+function parseResult(text) {
+  const lines = text.split('\n').map(l=>l.trim());
+
+  // TOP3
+  const top3 = [];
+  const topReg = /(\d)위[:\s]*(.+)/g;
+  let m;
+  while ((m=topReg.exec(text))!==null && top3.length<3) {
+    const after = text.slice(m.index+m[0].length, m.index+m[0].length+200);
+    const typeM   = after.match(/유형[:\s]*([^|\n]+)/);
+    const ctrM    = after.match(/CTR[:\s]*([\d.]+)%/);
+    const reasonM = after.match(/이유[:\s]*([^\n]+)/);
+    const title   = m[2].replace(/\s*\|.*/,'').trim();
+    if (title.length>3)
+      top3.push({ rank:parseInt(m[1]), title, type:typeM?typeM[1].trim():'추천', ctr:ctrM?ctrM[1]:(9.0-top3.length*0.4).toFixed(1), reason:reasonM?reasonM[1].trim():'' });
+  }
+
+  // ALL TITLES
+  const all = {};
+  let cur = null;
+  lines.forEach(line => {
+    const h = line.match(/^\[([^\]]+형)\]$/);
+    if (h) { cur=h[1]; return; }
+    const t = line.match(/^[1-3][.)]\s+(.{4,})/);
+    if (t && cur && !line.includes('|') && !line.includes('위:')) {
+      if (!all[cur]) all[cur]=[];
+      if (all[cur].length<3) all[cur].push(t[1].trim());
+    }
+  });
+
+  // THUMBS
+  const thumbs = {};
+  ['A','B'].forEach(v => {
+    const bm = text.match(new RegExp(`\\[버전${v}[^\\]]*\\]([\\s\\S]*?)(?=\\[버전[AB]|【|━|$)`));
+    const b  = bm?bm[1]:'';
+    thumbs[v] = {
+      label: v==='A'?'버전 A — 보수적':'버전 B — 공격적',
+      bg:   (b.match(/배경색[:\s]*([#\w]+)/i)||[])[1]?.trim()||(v==='A'?'#000000':'#8B0000'),
+      fg:   (b.match(/텍스트색[:\s]*([#\w]+)/i)||[])[1]?.trim()||(v==='A'?'#FFD700':'#FFFFFF'),
+      txt:  (b.match(/핵심문구[:\s]*(.{2,20})/i)||[])[1]?.trim()||'클릭하세요',
+      expr: (b.match(/표정[^:\n]*[:\s]*(.{4,40})/i)||[])[1]?.trim()||'따뜻한 표정',
+      lay:  (b.match(/레이아웃[:\s]*(.{5,100})/i)||[])[1]?.trim()||'인물 중앙 배치',
+      ctr:  (b.match(/예상CTR[:\s]*([\d.]+)%/i)||[])[1]||(v==='A'?'8.1':'9.2'),
+    };
+  });
+
+  // CHECKLIST
+  const defs = [
+    {cat:'title',name:'키워드 맨 앞 3단어 이내',pts:2},{cat:'title',name:'구체적 숫자 포함',pts:2},
+    {cat:'title',name:'35자 이내',pts:1},{cat:'title',name:'정보 격차 생성',pts:2},
+    {cat:'title',name:'감정 트리거 명확',pts:2},{cat:'title',name:'상식 파괴 요소',pts:1},
+    {cat:'thumb',name:'얼굴 60% 이상',pts:2},{cat:'thumb',name:'감동 1.5배 과장',pts:2},
+    {cat:'thumb',name:'정면 카메라 응시',pts:1},{cat:'thumb',name:'보색 대비 활용',pts:2},
+    {cat:'thumb',name:'텍스트 4단어 이내',pts:2},{cat:'thumb',name:'0.5초 안에 읽힘',pts:1},
+  ];
+  let total=0;
+  const checks={title:[],thumb:[]};
+  defs.forEach(d=>{
+    const esc=d.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const pm=text.match(new RegExp(esc+'[^\\n]{0,20}([✅❌])'));
+    const pass=pm?pm[1]==='✅':true;
+    if(pass) total+=d.pts;
+    checks[d.cat].push({...d,pass});
+  });
+  const sm=text.match(/총점[:\s]*(\d+)\s*\/\s*20/);
+  const score=sm?parseInt(sm[1]):total;
+  const rm=text.match(/등급[:\s]*(.{4,30})/);
+  const rating=rm?rm[1].trim():scoreRating(score);
+  return {top3,all,thumbs,checks,score,rating};
+}
+
+function scoreRating(s){
+  if(s>=18)return'클릭률 8% 이상 확실 🔥';
+  if(s>=15)return'클릭률 6~8% 예상 ✅';
+  if(s>=12)return'클릭률 4~6% 예상 ⚠️';
+  return'재설계 필요 ❌';
+}
+function scoreColor(s){
+  if(s>=18)return'#4ade80';
+  if(s>=15)return'#ffd700';
+  if(s>=12)return'#ff9f43';
+  return'#ff5555';
+}
+
+/* ── 렌더러 ─────────────────────────────────────────── */
+function renderAll(d) {
+  renderTop3(d.top3);
+  renderAllTitles(d.all);
+  renderThumbs(d.thumbs);
+  renderChecklist(d.checks, d.score, d.rating);
+  document.getElementById('rawBox').textContent = rawText;
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderTop3(top3) {
+  const el = document.getElementById('top3');
+  if (!top3.length) { el.innerHTML='<p style="color:var(--tx2);font-size:14px">아래 전체 리포트에서 제목을 확인하세요.</p>'; return; }
+  el.innerHTML = top3.map((t,i)=>`
+    <div class="title-card">
+      <div class="title-rank r${t.rank}">${t.rank}</div>
+      <div class="title-body">
+        <div class="title-text">${h(t.title)}</div>
+        <div class="title-tags">
+          <span class="tag tag-type">${h(t.type)}</span>
+          <span class="tag tag-ctr">예상 CTR ${h(t.ctr)}%</span>
+          <span class="tag tag-len">${t.title.length}자</span>
+        </div>
+        ${t.reason?`<div class="title-reason">${h(t.reason)}</div>`:''}
+      </div>
+      <button class="copy-btn" onclick="cpBtn(this,'${ha(t.title)}')">복사</button>
+    </div>`).join('');
+}
+
+function renderAllTitles(all) {
+  const el = document.getElementById('allGrid');
+  const keys = Object.keys(all);
+  if (!keys.length) { el.innerHTML='<p style="color:var(--tx2);font-size:14px;grid-column:1/-1">아래 전체 리포트를 참고하세요.</p>'; return; }
+  el.innerHTML = keys.map(type => {
+    const ctr = CTR_MAP[type]||'—';
+    return `<div class="type-box">
+      <div class="type-name">${h(type)} <span class="type-ctr">${ctr!=='—'?ctr+'%':''}</span></div>
+      ${all[type].map((t,i)=>`<div class="mini-title" onclick="cpMini(this,'${ha(t)}')">${h(t)}</div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderThumbs(thumbs) {
+  const el = document.getElementById('thumbGrid');
+  el.innerHTML = ['A','B'].map(v => {
+    const th = thumbs[v];
+    return `<div class="thumb-card">
+      <div class="thumb-label">${h(th.label)} — CTR ${h(th.ctr)}%</div>
+      <div class="thumb-vis" style="background:${th.bg};color:${th.fg}">
+        <div class="thumb-vis-inner">
+          <div class="thumb-expr">${h(th.expr)}</div>
+          <div class="thumb-txt">${h(th.txt)}</div>
+        </div>
+      </div>
+      <div class="thumb-specs">
+        <div><b>배경 </b>${h(th.bg)}</div>
+        <div><b>텍스트 </b>${h(th.fg)}</div>
+        <div><b>레이아웃 </b>${h(th.lay)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderChecklist(checks, score, rating) {
+  const el = document.getElementById('clGrid');
+  el.innerHTML = [['title','📝 제목 체크'],['thumb','🎨 썸네일 체크']].map(([key,label])=>{
+    const items = checks[key]||[];
+    const pts = items.reduce((a,i)=>a+(i.pass?i.pts:0),0);
+    const max = items.reduce((a,i)=>a+i.pts,0);
+    return `<div class="cl-box">
+      <h3>${label} (${pts}/${max}점)</h3>
+      ${items.map(it=>`<div class="cl-item">
+        <span style="font-size:14px;min-width:18px">${it.pass?'✅':'❌'}</span>
+        <span>${h(it.name)}</span>
+        <span class="cl-pts">+${it.pts}점</span>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  const c = scoreColor(score);
+  document.getElementById('scoreBox').innerHTML = `
+    <div class="score-num" style="color:${c}">${score}<span class="score-max">/20</span></div>
+    <div class="score-rating" style="color:${c}">${h(rating)}</div>`;
+}
+
+/* ── 복사 헬퍼 ──────────────────────────────────────── */
+function cpBtn(btn, text) {
+  navigator.clipboard.writeText(text).catch(()=>{});
+  btn.textContent='✓ 복사됨'; btn.classList.add('ok');
+  setTimeout(()=>{btn.textContent='복사';btn.classList.remove('ok');},2000);
+}
+function cpMini(el, text) {
+  navigator.clipboard.writeText(text).catch(()=>{});
+  el.classList.add('copied'); el.textContent='✓ 복사됨';
+  setTimeout(()=>{el.classList.remove('copied');el.textContent=text;},1500);
+}
+function copyAll() {
+  navigator.clipboard.writeText(rawText).catch(()=>{});
+  const btn = event.target;
+  btn.textContent='✅ 복사 완료!';
+  setTimeout(()=>btn.textContent='📋 전체 리포트 복사하기',2000);
+}
+
+/* ── HTML 이스케이프 ─────────────────────────────────── */
+function h(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function ha(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+/* ── 초기 버튼 상태 ──────────────────────────────────── */
+updateGenBtn();
+</script>
+</body>
+</html>
